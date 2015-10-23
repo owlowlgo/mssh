@@ -1,0 +1,46 @@
+#!/bin/zsh
+
+LANG=C
+
+file_temp=$(mktemp)
+if [[ "$#" == "0" ]]; then
+    file_input="$(readlink -f $0).cfg"
+else
+    file_input="$1"
+fi
+while read -r line; do
+    ((++tag))
+    menu_opt+=( ${tag} $(printf ${line} | cut -d , -f 1))
+done < ${file_input}
+whiptail --menu "mssh" 0 0 0 "${menu_opt[@]}" 2>${file_temp}
+if [[ $? == 0 ]]; then
+  menu_res_no=$(cat ${file_temp})
+  menu_res=$(sed -n "${menu_res_no}p" "${file_input}")
+  rm -f ${file_temp}
+else
+  printf "\n"
+  printf "cancelled.\n"
+  exit -1
+fi
+target_name=$(printf ${menu_res} | cut -d , -f 1)
+target_host=$(printf ${menu_res} | cut -d , -f 2)
+target_key="${HOME}/.ssh/$(printf ${menu_res} | cut -d , -f 3)"
+target_port=$(printf ${menu_res} | cut -d , -f 4)
+target_dolog=$(printf ${menu_res} | cut -d , -f 5)
+printf "\n"
+printf "host name: ${target_name}\n"
+printf "host key : ${target_key}\n"
+printf "host port: ${target_port}\n"
+datetime=$(date +%Y%m%d%H%M%S)
+if [[ ${target_dolog} == "yes" ]]; then
+  dir_log="${HOME}/logs/${target_host}/"
+  file_log="$target_name.${datetime}.log"    
+  printf "log to   : ${dir_log}${file_log}\n"
+  mkdir -p ${dir_log}
+  ssh -i ${target_key} -p ${target_port} ${target_host} | tee "${dir_log}${file_log}"
+else
+  printf "log to   : -\n"
+  ssh -i ${target_key} -p ${target_port} ${target_host}
+fi
+
+printf "done.\n"
